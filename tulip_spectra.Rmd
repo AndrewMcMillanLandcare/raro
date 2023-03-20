@@ -1,0 +1,134 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+
+
+library(tidyverse)
+
+
+
+rdn = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/"
+
+subdirs = list.dirs(rdn)
+
+
+
+
+```
+
+```{r}
+read_spec = function(ffn){
+  
+  # ffn = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/tulip_spectra_Sep_2016/green/Reflection_16-13-23-279.txt"
+  D = read_delim(ffn, col_names = F,skip = 16,delim = "\t")
+  names(D) <- c("wavelength", "refl")
+  
+  HDR_INFO=read_lines(ffn,n_max=3)
+  
+  g = ggplot(D, aes("wavelength", "refl")) + geom_point() + geom_line()
+  
+  
+  return(list(D,HDR_INFO,g))
+  
+}
+
+
+dn1 = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/tulip_spectra_Sep_2016/green/"
+dn2 = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/tulip_spectra_Sep_2016/leaves/"
+dn3 = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/tulip_spectra_Sep_2016/red/"
+dn4 = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/tulip_spectra_Sep_2016/orange/"
+
+dn_list = c(dn1,dn2,dn3,dn4)
+
+
+```
+
+
+
+```{r}
+
+
+for (idn in 1:length(dn_list)){
+  
+  fls = list.files(dn, full.names = T, pattern = ".txt$")
+  
+  FLS = lapply(fls, read_spec)
+  
+  for (i in 1:length(FLS)){
+    
+    # i=1
+    print("======================================")
+    print(i)
+    print("======================================")
+    data = FLS[[i]][[1]] %>% 
+      mutate(
+        wavelength = as.numeric(wavelength),
+        refl = as.numeric(refl),
+        id = FLS[[i]][[2]][1], 
+        Date_Info =  FLS[[i]][[2]][2]
+      )
+    
+    if (i==1){
+      alldata = data
+    }else{
+      alldata = bind_rows(alldata,data)
+    }
+    
+  }
+  curr_dn = basename(dn)
+  
+  alldata = alldata %>% 
+    mutate(
+      
+      id2 = str_extract(id,"\\d{2}\\-\\d{2}\\-\\d{2}\\-\\d{3}"),
+      YEAR   = str_extract(Date_Info, "\\d{4}$"),
+      DOW_MON_DOM   = str_extract(Date_Info,  "\\s[:alpha:]{3}\\s[:alpha:]{3}\\s\\d{2}"),
+      TIME = str_extract(Date_Info,  "\\d{2}\\:\\d{2}\\:\\d{2}"),
+      DATESTR = paste0(substr(DOW_MON_DOM,10,11),"-",substr(DOW_MON_DOM,6,8),"-", YEAR," ",TIME),
+      DATETIME = as.POSIXct(DATESTR, format = "%d-%b-%Y %H:%M:%S"),
+      plant_color = curr_dn ) %>% 
+    select(DATETIME, wavelength, refl, id2)
+  
+  g = ggplot(alldata, aes(wavelength, refl)) + geom_line() + facet_wrap(~id2) + ylim(c(0, 100))
+  g = g + ggtitle(paste("Tulip Spectra -" ,basename(dn)))
+  g
+  
+  ggsave( paste0(dn, "plots.png"),g)
+  
+  
+  str_extract("\rDate: Tue Sep 06 16:13:13 FJT 2016", "\\s[:alpha:]{3}\\s")
+  
+  YEAR   = str_extract("\rDate: Tue Sep 06 16:13:13 FJT 2016", "\\d{4}$")
+  DOW_MON_DOM = str_extract("\rDate: Tue Sep 06 16:13:13 FJT 2016", "\\s[:alpha:]{3}\\s[:alpha:]{3}\\s\\d{2}")
+  DATESTR = paste0(substr(DOW_MON_DOM,10,11),"-",substr(DOW_MON_DOM,6,8),"-", YEAR)
+  
+  
+  if (idn==1){
+    
+    
+    collated_spectra = alldata
+  }else{
+    collated_spectra = bind_rows(collated_spectra,alldata)
+  }
+  
+}
+
+
+
+collated_spectra_ffn = paste0(rdn, "collated_spectra.csv")
+write_csv(collated_spectra, collated_spectra_ffn)
+
+
+
+# FLS[[1]][[1]]
+# FLS[[1]][[2]]
+
+
+```
+
