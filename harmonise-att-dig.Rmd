@@ -1,0 +1,687 @@
+---
+title: "Combine-Raro-Digitised-ATT"
+output:
+  pdf_document: default
+  html_notebook: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+
+library(tidyverse)
+library(sf)
+
+root_dn = "F:/"
+
+proj_dn = paste0(root_dn,"Rarotonga/")
+ATT_dig_dn = paste0(proj_dn,"DIGITISATION/")
+
+
+# Andrew's digitisation
+MAT_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/AERIAL-ATT-OUTLINES-MAT.shp")
+TUR_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/AERIAL-ATT-OUTLINES-TUR.shp")
+
+# Harleys's digitisation
+AVA_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/Harley/Avatiu_manual_mapping_30m_ATT_HB.shp")
+TAK_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/Harley/Takuvaine_manual_mapping_30m_ATT_HB.shp")
+TCA_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/Harley/Takitimu_manual_mapping_30m_ATT_HB.shp")
+
+SITES = c("MAT","TUR","AVA","TAK", "TCA")
+SITE_ffns = c(MAT_ATT_dig_ffn, TUR_ATT_dig_ffn, AVA_ATT_dig_ffn, TAK_ATT_dig_ffn, TCA_ATT_dig_ffn)
+
+
+```
+
+
+# Read the digised ATT data that Harley and I di on week of 14 May 2024
+
+We digitised ATT in the aerial footage to extent of the Mavic 30m footage. We used Jans predictions on the Mavic Imagery to point us to where the ATT were. The 30 m imagery was resolved enough so that the deep learning could resolve the distinctive leaf pattern of ATT.
+
+Andrew did Matavera (MAT) and Turangi (TUR), Harley did Avatiu (AVA), Takitimu (TCA) and Takuvaine (TAK).
+
+
+```{r}
+
+
+
+# i = 3
+
+
+for (i in 1:length(SITE_ffns)){
+  
+  ATT_dig_ffn_curr = SITE_ffns[i]
+  ATT_site_curr = SITES[i]
+  ATT_polys_curr = st_read(ATT_dig_ffn_curr)
+  
+  ATT_polys_curr_hmzd = ATT_polys_curr %>% 
+    mutate(
+      sub_id = 1:nrow(ATT_polys_curr),
+      site = ATT_site_curr,
+      mapped = "NF",
+      truth = "NF",
+      checked = -1,
+      comment = ""
+    ) %>% 
+    dplyr::select(
+      sub_id,      site,      mapped,      truth,      checked,      comment
+    )
+  
+  if (i == 1){
+    
+    ATT_polys_all_hmzd = ATT_polys_curr_hmzd
+    
+  } else {
+    
+    ATT_polys_all_hmzd = ATT_polys_all_hmzd %>% bind_rows(ATT_polys_curr_hmzd)
+    
+  }
+  
+}
+
+
+ATT_polys_all_hmzd =ATT_polys_all_hmzd %>% mutate(id = 1:nrow(.))
+
+ATT_polys_all_hmzd_fn = 'AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial.shp'
+ATT_polys_all_hmzd_ffn = paste0(ATT_dig_dn, ATT_polys_all_hmzd_fn)
+
+st_write(ATT_polys_all_hmzd, ATT_polys_all_hmzd_ffn, append = T)
+
+```
+
+
+#Following classification of the flowering using mapaccuracy save it as a new file
+
+
+
+```{r}
+
+
+
+
+
+ATT_polys_all_hmzd_fn = 'AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial.shp'
+ATT_polys_all_hmzd_ffn = paste0(ATT_dig_dn, ATT_polys_all_hmzd_fn)
+
+ATT_polys_all_hmzd_classfd = st_read(ATT_polys_all_hmzd_ffn) %>% 
+  mutate(AREA = as.numeric(st_area(.)))
+
+ATT_polys_all_hmzd_classfd_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro-ATT-polys-aerial_flowering_class.shp" )
+
+st_write(ATT_polys_all_hmzd_classfd, ATT_polys_all_hmzd_classfd_ffn, append=F )
+
+
+ATT_polys_all_hmzd_classfd_ng = ATT_polys_all_hmzd_classfd %>% 
+  st_set_geometry(NULL) 
+
+ATT_polys_all_hmzd_classfd_ng_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "results.csv" )
+write_csv(ATT_polys_all_hmzd_classfd_ng, ATT_polys_all_hmzd_classfd_ng_ffn)
+
+ATT_polys_all_hmzd_classfd_ng_smy1 = ATT_polys_all_hmzd_classfd_ng %>% 
+  as_tibble() %>% 
+  group_by(site, truth) %>% 
+  summarise(
+    Number_ATT = length(sub_id),
+    Area_ATT = sum(AREA, na.rm)
+  )
+
+
+ATT_polys_all_hmzd_classfd_ng_smy1_wide = ATT_polys_all_hmzd_classfd_ng_smy1 %>% 
+  select(site, truth,Number_ATT) %>% 
+  spread(key = truth, value = Number_ATT) %>% 
+  mutate(TOTAL = NF + NO_FLOWERS + STRONG +VERYWEAK +WEAK)
+
+
+ATT_polys_all_hmzd_classfd_ng %>% filter(is.na(truth))
+
+```
+
+# Split big trees
+
+Just split all the big trees. In QGIS, we filtered F:/Rarotonga/DIGITISATION/AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial_flowering_class.shp
+for all trees > 20 m area
+
+Now we need to repeat map accuracy procedure
+
+```{r}
+
+
+raro_ATT_polys_aerial_flowering_class_ffn = "F:/Rarotonga/DIGITISATION/AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial_flowering_class.shp"
+
+ATT_POLYS = st_read(raro_ATT_polys_aerial_flowering_class_ffn)
+
+ATT_POLYS %>% pull(site) %>%  unique()
+
+ATT_POLYS_reset = ATT_POLYS %>% 
+  mutate(
+    id = 1:nrow(.),
+    mapped = truth,
+    truth = "UNASSIGNED",
+    checked = -1) %>% 
+  group_by(site) %>% 
+  mutate(
+    sub_id =  row_number(site))
+
+raro_ATT_polys_aerial_flowering_class_split_ffn = "F:/Rarotonga/DIGITISATION/AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial_split_unclassed.shp"
+
+st_write(ATT_POLYS_reset, raro_ATT_polys_aerial_flowering_class_split_ffn, append = F)
+
+
+
+
+
+
+```
+
+
+# and repeat analysis above -- add area and resave file
+```{r}
+raro_ATT_polys_aerial_split_unclassed_ffn = "F:/Rarotonga/DIGITISATION/AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial_split_unclassed.shp"
+
+
+raro_ATT_polys_aerial_split_unclassed = st_read(raro_ATT_polys_aerial_split_unclassed_ffn) %>% 
+  mutate(AREA = as.numeric(st_area(.)),
+         IS_ATT = as.integer(1))
+
+
+
+raro_ATT_polys_aerial_split_classedflowering_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro_ATT_labels.shp" )
+
+st_write(raro_ATT_polys_aerial_split_unclassed, raro_ATT_polys_aerial_split_classedflowering_ffn, append=F )
+```
+
+
+# read the classed file
+
+```{r}
+
+
+raro_ATT_polys_aerial_split_classedflowering_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro_ATT_polys_aerial_split_classedflowering.shp" )
+
+ATT_POLYS = st_read(raro_ATT_polys_aerial_split_classedflowering_ffn )
+
+ATT_POLYS_ng = ATT_POLYS %>% 
+  st_set_geometry(NULL) 
+
+ATT_POLYS_ng_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_dig_results.csv" )
+write_csv(ATT_POLYS_ng, ATT_POLYS_ng_ffn)
+
+ATT_POLYS_ng_smy1 = ATT_POLYS_ng %>% 
+  as_tibble() %>% 
+  group_by(site, truth) %>% 
+  summarise(
+    Number_ATT = length(sub_id),
+    Area_ATT = sum(AREA)
+  )
+
+
+ATT_POLYS_ng_smy1_wide_ntrees = ATT_POLYS_ng_smy1 %>% 
+  select(site, truth,Number_ATT) %>% 
+  spread(key = truth, value = Number_ATT) %>% 
+  mutate(
+    TOTAL =  NO_FLOWERS + STRONG +VERYWEAK +WEAK,
+    PERCENT_FLOWERING = 100 * (STRONG + WEAK)/TOTAL)
+
+
+ATT_POLYS_ng_smy1_wide_ntrees_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_ntree_smy_results.csv" )
+write_csv(ATT_POLYS_ng_smy1_wide_ntrees, ATT_POLYS_ng_smy1_wide_ntrees_ffn)
+
+
+
+SITES = c("MAT","TUR","AVA","TAK")
+EXTENT_OL_ffn = paste0("F:/Rarotonga/IMAGERY/MAVIC/EXTENTS-30m/EXTENT-", SITES,"-30m.shp")
+
+SITE_AREAS = data.frame(SITES = SITES, AREA_SQM = NA)
+for (i in 1:length(SITES)){
+  # i=1
+  SF = st_read(EXTENT_OL_ffn[i])
+  SITE_AREAS$AREA_SQM[i] = as.numeric(st_area(SF))
+  
+  
+  
+  
+}
+
+
+
+ATT_POLYS_ng_smy1_wide_area = ATT_POLYS_ng_smy1 %>% 
+  select(site, truth,Area_ATT) %>% 
+  spread(key = truth, value = Area_ATT) %>% 
+  left_join(SITE_AREAS, by = c("site" = "SITES")) %>% 
+  mutate(
+    TOTAL =  NO_FLOWERS + STRONG +VERYWEAK +WEAK,
+    PERCENT_AREA_ATT_FLOWERING = 100 * (STRONG + WEAK)/TOTAL,
+    PERCENT_AREA_ATT =  100*TOTAL/AREA_SQM
+  )
+
+
+ATT_POLYS_ng_smy1_wide_area_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_ATT_area_smy_results.csv" )
+write_csv(ATT_POLYS_ng_smy1_wide_area, ATT_POLYS_ng_smy1_wide_area_ffn)
+
+
+
+ATT_polys_all_hmzd_classfd_ng %>% filter(is.na(truth))
+
+
+
+
+```
+
+
+#create flowering trees only layer
+
+```{r}
+
+
+raro_ATT_polys_aerial_split_classedflowering_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro_ATT_polys_aerial_split_classedflowering.shp" )
+
+ATT_POLYS = st_read(raro_ATT_polys_aerial_split_classedflowering_ffn )
+
+ATT_POLYS_FLOWERING_ONLY = ATT_POLYS %>% 
+  filter(truth == "WEAK" | truth == "STRONG")
+
+
+ATT_POLYS_FLOWERING_ONLY_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_FLOWERING_ONLY.shp" )
+st_write(ATT_POLYS_FLOWERING_ONLY, ATT_POLYS_FLOWERING_ONLY_ffn, append = F )
+
+ATT_POLYS_FLOWERING_ONLY_ffn = paste0('F:/Rarotonga/ANDREW_DEEPSEG/', "ATT_POLYS_FLOWERING_ONLY.shp" )
+st_write(ATT_POLYS_FLOWERING_ONLY, ATT_POLYS_FLOWERING_ONLY_ffn, append = F )
+
+
+
+```
+
+# wrap in Harleys data set to the larger data set
+
+```{r}
+
+raro_ATT_polys_aerial_split_classedflowering_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro_ATT_polys_aerial_split_classedflowering.shp" )
+
+ATT_POLYS = st_read(raro_ATT_polys_aerial_split_classedflowering_ffn )
+
+nrow_existing  = nrow(ATT_POLYS)
+
+TCA_ATT_dig_ffn = paste0("F:/Rarotonga/DIGITISATION/AERIAL/Harley/Takitimu_manual_mapping_30m_ATT_HB.shp")
+TCA_ATT_dig = st_read(TCA_ATT_dig_ffn)
+
+TCA_ATT_dig_mdf = TCA_ATT_dig %>% 
+  mutate(
+    site="TCA",
+    sub_id = 1:nrow(.),
+    mapped="", 
+    truth = "", 
+    checked=-1, 
+    comment = "",
+    id = nrow_existing + sub_id,
+    AREA = as.numeric(st_area(.)),
+    IS_ATT=1) %>% 
+  dplyr::select(sub_id, site,mapped,truth,checked,comment,id,AREA, IS_ATT,geometry)
+
+
+TCA_ATT_dig_mdf_ffn ="F:/Rarotonga/DIGITISATION/AERIAL/Harley/Takitimu_manual_mapping_30m_ATT_HB_hmnzd.shp"
+
+st_write(TCA_ATT_dig_mdf, TCA_ATT_dig_mdf_ffn, append = F)
+
+#this will now be read by map accuracy. Classified for flowering and resaved
+
+
+```
+
+# Now after flower classification, fold this layer (Takitimu_manual_mapping_30m_ATT_HB_hmnzd.shp) into the larger data set
+
+```{r}
+
+TCA_ATT_dig_mdf_ffn ="F:/Rarotonga/DIGITISATION/AERIAL/Harley/Takitimu_manual_mapping_30m_ATT_HB_hmnzd.shp"
+TCA_ATT_dig_mdf2 = st_read(TCA_ATT_dig_mdf_ffn)
+
+raro_ATT_polys_aerial_split_classedflowering_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro_ATT_polys_aerial_split_classedflowering.shp" )
+ATT_POLYS = st_read(raro_ATT_polys_aerial_split_classedflowering_ffn )
+
+
+ATT_POLYS_v2 = ATT_POLYS %>% bind_rows(TCA_ATT_dig_mdf2)
+ATT_POLYS_v2_ffn =  paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "raro_ATT_polys_aerial_split_classedflowering_v2.shp" )
+st_write(ATT_POLYS_v2, ATT_POLYS_v2_ffn, append = F)
+
+library(mapview)
+mapview(ATT_POLYS_v2)
+
+
+```
+
+# NOTE!!! to use a more simple name we made a copy of this file:
+raro_ATT_polys_aerial_split_classedflowering_v2.shp
+and called it:
+ATT_POLYS_v2.shp
+
+
+# finally create another version of ATT_POLYS_v2.shp and filter for only fowering trees
+
+```{r}
+
+ATT_POLYS_v2_ffn =paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_v2.shp" )
+ATT_POLYS_v2 = st_read(ATT_POLYS_v2_ffn)
+
+ATT_POLYS_v2_FLOWERING_ONLY = ATT_POLYS_v2 %>% 
+  filter(truth == "STRONG"  | truth == "WEAK"     )
+
+ATT_POLYS_v2_FLOWERING_ONLY_ffn = ATT_POLYS_v2_ffn =paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_v2_FLOWERING_ONLY.shp" )
+
+st_write(ATT_POLYS_v2_FLOWERING_ONLY, ATT_POLYS_v2_FLOWERING_ONLY_ffn, append = F)
+
+
+
+
+```
+
+
+
+# Repeat the stats on version 2 of the data
+
+```{r}
+
+
+ATT_POLYS_v2_ffn =paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_v2.shp" )
+ATT_POLYS_v2 = st_read(ATT_POLYS_v2_ffn)
+
+
+ATT_POLYS_ng = ATT_POLYS_v2 %>% 
+  st_set_geometry(NULL) 
+
+ATT_POLYS_ng_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_dig_results.csv" )
+write_csv(ATT_POLYS_ng, ATT_POLYS_ng_ffn)
+
+ATT_POLYS_ng_smy1 = ATT_POLYS_ng %>% 
+  as_tibble() %>% 
+  group_by(site, truth) %>% 
+  summarise(
+    Number_ATT = length(sub_id),
+    Area_ATT = sum(AREA)
+  )
+
+
+ATT_POLYS_ng_smy1_wide_ntrees = ATT_POLYS_ng_smy1 %>% 
+  select(site, truth,Number_ATT) %>% 
+  spread(key = truth, value = Number_ATT) %>% 
+  mutate(
+    TOTAL =  NO_FLOWERS + STRONG +VERYWEAK +WEAK,
+    PERCENT_FLOWERING = 100 * (STRONG + WEAK)/TOTAL)
+
+
+ATT_POLYS_ng_smy1_wide_ntrees_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_ntree_smy_results.csv" )
+write_csv(ATT_POLYS_ng_smy1_wide_ntrees, ATT_POLYS_ng_smy1_wide_ntrees_ffn)
+
+
+
+SITES = c("MAT","TUR","AVA","TAK")
+EXTENT_OL_ffn = paste0("F:/Rarotonga/IMAGERY/MAVIC/EXTENTS-30m/EXTENT-", SITES,"-30m.shp")
+
+SITE_AREAS = data.frame(SITES = SITES, AREA_SQM = NA)
+for (i in 1:length(SITES)){
+  # i=1
+  SF = st_read(EXTENT_OL_ffn[i])
+  SITE_AREAS$AREA_SQM[i] = as.numeric(st_area(SF))
+  
+  
+  
+  
+}
+
+
+
+ATT_POLYS_ng_smy1_wide_area = ATT_POLYS_ng_smy1 %>% 
+  select(site, truth,Area_ATT) %>% 
+  spread(key = truth, value = Area_ATT) %>% 
+  left_join(SITE_AREAS, by = c("site" = "SITES")) %>% 
+  mutate(
+    TOTAL =  NO_FLOWERS + STRONG +VERYWEAK +WEAK,
+    PERCENT_AREA_ATT_FLOWERING = 100 * (STRONG + WEAK)/TOTAL,
+    PERCENT_AREA_ATT =  100*TOTAL/AREA_SQM
+  )
+
+
+ATT_POLYS_ng_smy1_wide_area_ffn = paste0(ATT_dig_dn,'AERIAL/Combined-Harmonised-ATT-Shapes/', "ATT_POLYS_ATT_area_smy_results.csv" )
+write_csv(ATT_POLYS_ng_smy1_wide_area, ATT_POLYS_ng_smy1_wide_area_ffn)
+
+
+
+ATT_polys_all_hmzd_classfd_ng %>% filter(is.na(truth))
+
+
+
+
+```
+
+
+
+#combine all the outline files
+
+```{r}
+
+
+SITES = c("MAT","TUR","AVA","TAK", "TCA")
+EXTENT_OL_ffn = paste0("F:/Rarotonga/IMAGERY/MAVIC/EXTENTS-30m/EXTENT-", SITES,"-30m.shp")
+
+for (isite in 1:length(SITES)){
+  
+  csite = st_read(EXTENT_OL_ffn[isite])
+  
+  if (isite == 1){
+    
+    training_areas_mavic_30m = csite
+    
+    
+  } else {
+    
+    training_areas_mavic_30m = training_areas_mavic_30m %>% bind_rows(csite)
+    
+  }
+  
+  
+  
+  
+}
+
+training_areas_mavic_30m_ffn = paste0("F:/Rarotonga/IMAGERY/MAVIC/EXTENTS-30m/EXTENT-ALLSITES-30m.shp")
+st_write(training_areas_mavic_30m, training_areas_mavic_30m_ffn, append = F)
+
+
+```
+
+# Ok Jan has run deep learning on ATT_POLYS_v2.shp
+The file is called: raro_aerial_prediction_jan_first_try.gpkg
+
+We created a rectangles throughout the island and intersected these with Jans layerto create a new layer called 
+new-training-areas_x_raro_first_attempt.shp
+
+```{r}
+
+# The predictions are in 
+polys_pred_select_ffn = "F:/Rarotonga/ANDREW_DEEPSEG/New-Training-Areas/new-training-areas_x_raro_first_attempt.shp"
+polys_pred_select = st_read(polys_pred_select_ffn)
+
+polys_pred_select_mdf = polys_pred_select %>% 
+  mutate(
+    id = 1:nrow(.),
+    mapped = "ATT-F",
+    truth = "",
+    checked = as.integer(-1),
+    comment = "",
+    AREA = as.numeric(st_area(.))) %>% 
+  filter(AREA > 5)
+
+polys_pred_select_mdf_ffn = "F:/Rarotonga/ANDREW_DEEPSEG/New-Training-Areas/new-training-areas_x_raro_first_attempt_mapacc.shp"
+st_write(polys_pred_select_mdf, polys_pred_select_mdf_ffn, append = F)
+
+#mapaccuracy -v F:/Rarotonga/ANDREW_DEEPSEG/New-Training-Areas/new-training-areas_x_raro_first_attempt.shp F:\Rarotonga\IMAGERY\AERIAL\raro-ortho-v3.kea
+
+
+
+
+
+
+```
+
+
+#Resume this work on 4/6/24
+
+```{r}
+
+
+
+
+# The predictions are in 
+polys_pred_select_ffn = "F:/Rarotonga/Deep-Learning-Progress/Training-Areas-Round3/Jan-Pred-in-TA-Round3-Sel.shp"
+file.exists(polys_pred_select_ffn)
+polys_pred_select = st_read(polys_pred_select_ffn)
+
+polys_pred_select_mdf = polys_pred_select %>% 
+  mutate(
+    id = 1:nrow(.),
+    mapped = "ATT-F",
+    truth = "",
+    checked = as.integer(-1),
+    comment = "",
+    AREA = as.numeric(st_area(.))) %>% 
+  filter(AREA > 5)
+
+polys_pred_select_mdf_ffn = "F:/Rarotonga/Deep-Learning-Progress/Training-Areas-Round3/Jan-Pred-in-TA-Round3-Sel_4_mapacc.shp"
+st_write(polys_pred_select_mdf, polys_pred_select_mdf_ffn, append = F)
+
+```
+
+
+# AFTER GOING THROUGH THIS LAYER IN MAP ACCURACY AND DOING SOME TIDYING IN qgis
+
+```{r}
+
+#Read the Map accuracy veriufied file.
+
+round3_training_polys_all_ffn = "F:/Rarotonga/Deep-Learning-Progress/Training-Areas-Round3/Jan-Pred-in-TA-Round3-Sel_4_mapacc.shp"
+round3_training_polys_all = st_read(round3_training_polys_all_ffn) # 704 features
+
+#filter this data set for those polygons that are strongly flowering ("_FSO")
+round3_training_polys_FSO = round3_training_polys_all %>% 
+  filter(truth == "STRONG") %>% 
+  mutate(IS_ATT = as.integer(1)) # 46 features
+
+
+len_na_fid = length(which(is.na(round3_training_polys_FSO$fid)))
+
+if (len_na_fid > 0){
+  
+  max_fid = max(round3_training_polys_FSO$fid, na.rm=T)
+  fids_fill = (max_fid+1):(max_fid+len_na_fid)
+  round3_training_polys_FSO$fid[which(is.na(round3_training_polys_FSO$fid))] = fids_fill
+  round3_training_polys_FSO$fid = as.integer(round3_training_polys_FSO$fid)
+  
+}
+
+len_na_fid_revised = length(which(is.na(round3_training_polys_FSO$fid)))
+
+
+
+
+round3_training_polys_FSO_ffn = "F:/Rarotonga/Deep-Learning-Progress/Training-Areas-Round3/Jan-Pred-in-TA-Round3-Sel_4_mapacc_FSO.shp"
+st_write(round3_training_polys_FSO, round3_training_polys_FSO_ffn, append = F)
+
+#filter this data set for those polygons that are strongly or weakly flowering ("_FSW")
+round3_training_polys_FSW = round3_training_polys_all %>%
+  filter(truth == "STRONG" | truth == "WEAK") %>% 
+  mutate(IS_ATT = as.integer(1))   # 170 features
+
+len_na_fid = length(which(is.na(round3_training_polys_FSW$fid)))
+
+if (len_na_fid > 0){
+  
+  max_fid = max(round3_training_polys_FSW$fid, na.rm=T)
+  fids_fill = (max_fid+1):(max_fid+len_na_fid)
+  round3_training_polys_FSW$fid[which(is.na(round3_training_polys_FSW$fid))] = fids_fill
+  round3_training_polys_FSW$fid = as.integer(round3_training_polys_FSW$fid)
+  round3_training_polys_FSW = round3_training_polys_FSW %>% dplyr::select(-fid)
+}
+
+len_na_fid_revised = length(which(is.na(round3_training_polys_FSW$fid)))
+
+
+round3_training_polys_FSW_ffn = "F:/Rarotonga/Deep-Learning-Progress/Training-Areas-Round3/Jan-Pred-in-TA-Round3-Sel_4_mapacc_FSW.shp"
+st_write(round3_training_polys_FSW, round3_training_polys_FSW_ffn, append = F)
+
+
+
+
+
+
+round3_training_areas_ffn = "F:/Rarotonga/Deep-Learning-Progress/Training-Areas-Round3/Training-Areas-Round3-Selected.shp"
+round3_training_areas = st_read(round3_training_areas_ffn)
+
+library(mapview)
+options(viewer=NULL)
+mapview(round3_training_areas)
+
+
+
+
+```
+
+
+# Now combine the falcateria layers that Harley has made -->
+
+
+```{r}
+
+
+dig_folder = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Deep-Learning-Progress/Aerial-digitisation/Harley/"
+
+fls = list.files(dig_folder, pattern = "Falcataria\\_HB\\.shp$")
+
+sitenames = str_extract(fls, "^\\w{1,20}(?=_manual_mapping_30m_Falcataria_HB\\.shp)")
+
+len_good=0
+
+for (isite in 1:length(sitenames)){
+  
+  
+  
+  # isite=1
+  csite = sitenames[isite]
+  fname = paste0(csite, "_manual_mapping_30m_Falcataria_HB.shp")
+  ffname = paste0(dig_folder, fname)
+  
+  file.exists(ffname)
+  
+  falc_polys_curr = st_read(ffname) %>% 
+    mutate(
+      AREA_SQM = as.numeric(st_area(.)),
+      site = csite,
+      IS_FALC = as.integer(1)) 
+  
+  nrow_c_file = nrow(falc_polys_curr)
+  
+  if (nrow_c_file > 0){
+    len_good = len_good + 1
+    if (len_good==1){
+      
+      combined_falc_polys = falc_polys_curr
+    }else{
+      
+      combined_falc_polys = bind_rows(combined_falc_polys, falc_polys_curr)
+    }
+    
+    
+    
+  }
+  
+  
+  
+}
+
+
+combined_falc_polys_ffn = paste0(dig_folder, "all_sites_combined_manual_mapping_30m_Falcataria_HB_combined.shp")
+st_write(combined_falc_polys, combined_falc_polys_ffn, append = F)
+
+
+
+```
+
+
+

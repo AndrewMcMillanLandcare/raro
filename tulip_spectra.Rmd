@@ -10,7 +10,7 @@ editor_options:
 
 
 library(tidyverse)
-
+library(plotly)
 
 
 rdn = "C:/Users/McMillanAn/OneDrive - MWLR/Rarotonga/"
@@ -56,6 +56,9 @@ dn_list = c(dn1,dn2,dn3,dn4)
 
 for (idn in 1:length(dn_list)){
   
+  dn = dn_list[idn]
+  
+  
   fls = list.files(dn, full.names = T, pattern = ".txt$")
   
   FLS = lapply(fls, read_spec)
@@ -93,7 +96,7 @@ for (idn in 1:length(dn_list)){
       DATESTR = paste0(substr(DOW_MON_DOM,10,11),"-",substr(DOW_MON_DOM,6,8),"-", YEAR," ",TIME),
       DATETIME = as.POSIXct(DATESTR, format = "%d-%b-%Y %H:%M:%S"),
       plant_color = curr_dn ) %>% 
-    select(DATETIME, wavelength, refl, id2)
+    select(DATETIME, wavelength, refl, id2, plant_color)
   
   g = ggplot(alldata, aes(wavelength, refl)) + geom_line() + facet_wrap(~id2) + ylim(c(0, 100))
   g = g + ggtitle(paste("Tulip Spectra -" ,basename(dn)))
@@ -123,6 +126,53 @@ for (idn in 1:length(dn_list)){
 
 collated_spectra_ffn = paste0(rdn, "collated_spectra.csv")
 write_csv(collated_spectra, collated_spectra_ffn)
+
+
+#summarise spectra
+collated_spectra_smy = collated_spectra %>% 
+  filter(refl >=0 & refl <=100) %>% 
+  mutate(PLANT_COMPONENT = 
+           case_when(
+             plant_color == "leaves" ~ "LEAVES",
+             plant_color == "red" ~ "RED BITS",
+             plant_color == "green" ~ "GREEN BITS",
+             plant_color == "orange" ~ "ORANGE BITS"
+           )) %>% 
+  group_by(PLANT_COMPONENT, wavelength) %>% 
+  summarise(
+    refl_avg = mean(refl),
+    refl_sd = sd(refl)) %>% 
+  mutate(
+    refl_plus_1sd = refl_avg + refl_sd,
+    refl_minus_1sd = refl_avg - refl_sd,
+  )
+
+
+collated_spectra_smy$plant_color = factor(collated_spectra$plant_color, levels = c("green","leaves","orange","red"))
+
+colmap = c("green"="green","leaves"="darkgreen", "orange"="orange", "red" = "red")
+
+    
+g = ggplot(collated_spectra_smy) +geom_ribbon(aes(wavelength, ymin = refl_minus_1sd, ymax = refl_plus_1sd ), fill = "cyan", alpha = .5) + facet_wrap(~PLANT_COMPONENT)
+g = g  + geom_line(aes(wavelength , refl_avg), size = 1)
+g = g + scale_color_manual(values = c("green", "darkgreen","orange","red"))
+g
+
+ggsave(paste0(rdn,"spectra_facet_plot.png"), g)
+
+
+g = ggplot(collated_spectra_smy) +geom_line(aes(wavelength , refl_avg, color = PLANT_COMPONENT), size = 1) 
+g = g + scale_color_manual(values = c("green", "darkgreen","orange","red"))
+g
+
+
+ggsave(paste0(rdn,"spectra_single_plot.png"), g)
+
+
+
+
+
+
 
 
 

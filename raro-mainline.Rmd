@@ -1,0 +1,1047 @@
+
+---
+title: "raro-MainLine"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+chunk_output_type: console
+---
+
+
+
+# Libraries and folders
+# Settings, palletes, orders and include-lists
+
+```{r}
+
+library(raster)
+library(exactextractr)
+library(fasterize)
+library(hsdar)
+
+options(show_col_types = FALSE)
+options(readr.show_col_types = FALSE)
+
+
+proj_dn = "PRJ3606-MFAT-MISCCAP/"
+
+
+# identify the computer (and OS)
+Current_PC <- Sys.info()["nodename"]
+
+if (Current_PC == "EANZ-DT01-Linux") {
+  root = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Projects/",proj_dn)
+  ncore_rec = 15
+} else if (Current_PC == "EANZ-DT01") {
+  root = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Projects/", proj_dn)
+  ncore_rec = 15
+  
+} else if (Current_PC == "styx") {
+  root = paste0("/mnt/data/mcmillana/",proj_dn)
+  ncore_rec = 64
+} else if (Current_PC == "L-8P30JW3") {
+  root = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Projects/", proj_dn)
+  ncore_rec = 18
+} else if (Current_PC == "PN-VIVE-W10") {
+  root = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Projects/", proj_dn)
+  ncore_rec = 15
+} else {
+  root = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Projects/", proj_dn)
+  ncore_rec = 15
+}
+
+
+
+
+
+
+datadir = paste0(root, "data/")
+plotdir = paste0(root, "plots/")
+tabledir = paste0(root, "tables/")
+
+root2 = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/"
+datadir2 = paste0(root2,"Data/")
+
+planetdir2 = paste0(datadir2, "Rarotonga/PlanetData/original_delivery/")
+
+align_dn = paste0(datadir2, "Rarotonga/Aligned-Data/")
+
+
+# there are 5 planet products
+
+# 1. analytics_udm2
+# 2. panchromatic
+# 3. pansharpened_udm2
+# 4. analytic_sr_udm2
+# 5. visual
+
+#there are 4 different dates
+
+# 1. 19 July 2023
+# 2. 24 July 2023
+# 3. 7 Aug 2023
+# 4. 8 Aug 2023
+
+
+
+
+A = system('gdalinfo')
+
+
+
+
+
+
+
+
+
+
+
+
+
+util_script = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Code/R/utils/", "mcm_sp_utils.R")
+source(util_script)
+
+
+hahs_script = paste0("D:/HAHS_Projects/code/R/HAHS_Processing/", "HAHS_utils.R")
+source(hahs_script)
+
+
+
+cbbPalette <- c("#D55E00", "#56B4E9", "#CC79A7", "#009E73", "#000000", "#E69F00", "#56B4E9")
+
+Palette_01 <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+Palette_02 <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2","#000000", "#CC79A7")
+
+
+
+
+```
+
+The belo chunk can only be run on my laptop (not on VIVE)
+
+```{r}
+
+system('wsl cd ~/raroor')
+system('wsl ls ~/rarobasic')
+
+
+# fn_ptrn = "20230808_190708_ssc16d1_0006_basic_analytic.tif"
+
+rarobasic_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/PlanetData/basic_scenes/Rarotonga_Scenes_skysatscene_basic_analytic_udm2/SkySatScene/"
+
+dir.exists(rarobasic_dn)
+
+fn_ptrn = "\\d{8}\\_\\d{6}\\_ssc\\d{2}d\\d{1}\\_\\d{4}_basic_analytic.tif"
+
+flist_basic_an = list.files(rarobasic_dn, pattern = fn_ptrn)
+flist_basic_an
+
+
+#Sample gdal command for wsl
+SCMD = "wsl gdalwarp -t_srs epsg:32704 -wo SAMPLE_GRID=NO -et 0 -rpc -srcnodata 0 -dstnodata 'None' -to RPC=/home/mcmillanan/rarobasic/ortho/Raro_Mesh_DSM_2023.tif /home/mcmillanan/rarobasic/20230808_190708_ssc16d1_0015_basic_analytic.tif /home/mcmillanan/rarobasic/ortho/20230808_190708_ssc16d1_0015_basic_analytic_ortho3.tif"
+
+system(SCMD) # cannot find gdalinfo
+
+
+
+sep = "\\\\"
+rarobasic_dn_4cmd = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/PlanetData/basic_scenes/Rarotonga_Scenes_skysatscene_basic_analytic_udm2/SkySatScene/"
+
+
+# 
+# 
+# CMD = paste0("gdalinfo ", "\"",  rarobasic_dn_4cmd, "\"", "20230808_193818_ssc15d3_0012_basic_analytic.tif")
+# print(CMD)
+# system(CMD)
+
+W10CMD_stub1 = "gdalwarp -t_srs epsg:32704 -wo SAMPLE_GRID=NO -et 0 -rpc -srcnodata 0 -dstnodata 'None' -to RPC="
+
+# DSM_ffname = paste0("\"",  rarobasic_dn_4cmd, "/ortho/Raro_Mesh_DSM_2023.tif", "\"")
+# basic_strip_ffname = paste0("\"",  rarobasic_dn_4cmd, "20230808_193818_ssc15d3_0012_basic_analytic.tif", "\"")
+# basic_strip_ortho_ffname = paste0("\"",  rarobasic_dn_4cmd, "/ortho/20230808_193818_ssc15d3_0012_basic_analytic_ortho.tif", "\"")
+
+qm = "\""
+```
+
+
+Loop through all images with pattern: 20230808_190708_ssc16d3_0015_basic_analytic.tif and orthorectify using RPC
+(following approach in https://up42.com/blog/how-to-perform-orthorectification-a-practical-guide#practical-example)
+
+```{r}
+
+for (ifile in 1:length(flist_basic_an)){
+  
+  # ifile = 1
+  basic_strip_ffname_curr = paste0(qm,rarobasic_dn_4cmd, flist_basic_an[ifile], qm)
+  basic_strip_ffname_ortho_curr = paste0(qm, rarobasic_dn_4cmd, "ortho/", tools::file_path_sans_ext(flist_basic_an[ifile]),"_ortho.tif", qm)
+  
+  CMD = paste0(W10CMD_stub1, DSM_ffname, " ", basic_strip_ffname_curr, " ", basic_strip_ffname_ortho_curr)
+  print(CMD)
+  system(CMD)
+}
+
+
+CMD = paste0(W10CMD_stub1, DSM_ffname, " ", basic_strip_ffname, " ", basic_strip_ortho_ffname)
+print(CMD)
+system(CMD)
+
+
+```
+
+Run some gdal commands to merge these tifs together
+
+```{r}
+
+# 1. Create a vrt
+
+gdalbuildvrt nelson-tasman-2021-DEM.vrt *.kea
+
+
+
+# 2. Create a kea from the VRT
+gdal_translate -of KEA nelson-tasman-2021-DEM.vrt ../nelson-tasman-2021-DEM.kea
+
+
+# 3. add overviews to the KEA
+
+gdaladdo -r average LCLU.kea
+
+```
+
+
+# Extract the satellite imagery through the Mavic Extents
+
+
+```{r}
+
+
+# get a  list of all the relevant planet files
+planetdir2_sr = paste0(planetdir2, "Rarotonga_July_Aug_2023_skysatcollect_analytic_sr_udm2 (1)/SkySatCollect/")
+
+PTRN = "\\d{8}\\_\\d{6}\\_ssc\\d{1,3}\\_u\\d{4}\\_analytic_SR.tif$"
+
+dir.exists(planetdir2_sr)
+list.files(planetdir2_sr) 
+
+planet_sr_flist = list.files(planetdir2_sr, pattern = PTRN, full.names = T) 
+
+planet_SR_NUM = paste0("SR0", 1:7)
+planet_sr_dates = str_extract(basename(planet_sr_flist), "^\\d{8}")
+planet_ssc_nos = str_extract(basename(planet_sr_flist), "ssc\\d{1,3}")
+planet_u_nos = str_extract(basename(planet_sr_flist), "u\\d{4}")
+planet_img_UID = paste0(planet_SR_NUM,"_",planet_sr_dates, "_", planet_ssc_nos,"_", planet_u_nos)
+
+# get a list of the shape files that are the extents of tthe 100 m Mavic flights
+
+Mavic_extents_dn = align_dn 
+Mavic_extents_ffns = list.files(Mavic_extents_dn, pattern = "MAVIC-RGB-\\w{3}-\\d{6}-100M-POLYEXT-N\\d{5}-V\\d{2}.gpkg", full.names = T)
+
+for (iimg in 1:length(planet_sr_flist)){
+  
+  # iimg=1
+  cimg = rast(planet_sr_flist[iimg])
+  cimg_UID = planet_img_UID[iimg]
+  
+  for (ipoly in 1:length(Mavic_extents_ffns)){
+    
+    # ipoly = 1
+    cpoly = st_read(Mavic_extents_ffns[ipoly])
+    
+    
+    cpoly_ext = ext(cpoly)
+    cimg_ext = ext(cimg)
+    
+    IX = intersect(cpoly_ext, cimg_ext)
+    
+    if(!is.null(IX)){
+      
+      extract = crop(cimg, cpoly)
+      
+      extract_fn = paste0(cimg_UID,"_clip_", substr(cpoly$location,8,10), ".tif")
+      extract_ffn = paste0(align_dn,extract_fn )
+      
+      writeRaster(extract, extract_ffn, overwrite=T)
+    }
+  }
+  
+  
+  
+  
+  
+}
+#
+
+
+```
+
+
+# CHUNK 5001. create polygon tiles of HAHS data
+
+```{r}
+
+
+
+
+tile_dn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/"
+
+create_tile_polygons(tile_dn)
+
+
+
+```
+
+# CHUNK 5002. create polygon tiles of HAHS data
+
+```{r}
+
+
+
+
+tile_dn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/"
+
+create_tile_polygons(tile_dn)
+
+
+
+```
+
+Blue 450-515 nm Green 515-595 nm Red 605-695 nm NIR 740-900 nm PAN 450-900 nm
+
+
+
+
+# ===================================
+# SECTION 6000 - HSI ANALYSIS
+# ===================================
+
+# CHNK 6001. create polygon tiles of HAHS data
+
+```{r}
+
+# > align_dn
+# [1] "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Aligned-Data/"
+
+
+POLYLBLS_N00005_ffn = paste0(align_dn, "MAVIC-RGB-TUR-230811-100M-POLYLBLS-N00005-V01.gpkg.shp") 
+POLYLBLS_N00005 = st_read(POLYLBLS_N00005_ffn)
+
+POLYLBLS_N00005_nogeo = POLYLBLS_N00005 %>% st_set_geometry(NULL)
+POLYLBLS_N00005_nogeo_ffn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Polygon-CSV-Files/ MAVIC-RGB-TUR-230811-100M-POLYLBLS-N00005-V01.csv"
+write_csv(POLYLBLS_N00005_nogeo, POLYLBLS_N00005_nogeo_ffn)
+
+# mapview(POLYLBLS_N00005)
+
+
+# Create a layer of pure ATT with Confidence Level 5
+
+POLYLBLS_N00005_ATT_Only_Q5 = POLYLBLS_N00005 %>% 
+  filter(SPS == "ATT" & CONFIDENCE==5)
+
+POLYLBLS_N00005_ATT_Only_Q5_ffn = paste0(align_dn, "POLYLBLS_N00005_ATT_Only_Q5.gpkg")
+st_write(POLYLBLS_N00005_ATT_Only_Q5, POLYLBLS_N00005_ATT_Only_Q5_ffn, append = F)
+
+
+# Intersect the pure ATT polygon layers with the HS Tiles Polygon Layer
+
+HS_TILE_POLYS_BOUNDARY = st_read("F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/TILE_POLYGONS.shp")  %>%
+  st_combine()
+
+mapview(HS_TILE_POLYS_BOUNDARY)
+
+
+POLYLBLS_N00005_ATT_Only_Q5_ffn = paste0(align_dn, "POLYLBLS_N00005_ATT_Only_Q5.gpkg")
+POLYLBLS_N00005_ATT_Only_Q5 = st_read(POLYLBLS_N00005_ATT_Only_Q5_ffn)
+
+RASTOL_NANO_TUR_N00006_ffn = paste0(align_dn, "M600-NANO-TUR-230811-80M-RASTOL-N00006-V01.shp")
+RASTOL_NANO_TUR_N00006 = st_read(RASTOL_NANO_TUR_N00006_ffn)
+
+POLYLBLS_N00005_ATT_Only_Q5_HS = st_intersection(POLYLBLS_N00005_ATT_Only_Q5, RASTOL_NANO_TUR_N00006)
+POLYLBLS_N00005_ATT_Only_Q5_HS_ffn = paste0(align_dn, "POLYLBLS_N00005_ATT_Only_Q5_HS.gpkg")
+st_write(POLYLBLS_N00005_ATT_Only_Q5_HS, POLYLBLS_N00005_ATT_Only_Q5_HS_ffn, append = F)
+
+
+mapview(POLYLBLS_N00005_ATT_Only_Q5_HS)
+
+
+```
+
+
+# CHNK 6002. Extract Hyperspectral Data through Polygons 
+
+
+```{r}
+
+POLY_fn = "M600-NANO-TUR-230811-80M-POLYLBL-N00007-V01.shp"
+POLY_ffn = paste0(align_dn, POLY_fn)
+POLY = st_read(POLY_ffn)
+
+r_TUR_HS_80m_ffn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE_32704.kea"
+r_TUR_HS_80m = rast(r_TUR_HS_80m_ffn)
+
+
+r_TUR_HS_80m_ffn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE.kea"
+r_TUR_HS_80m = rast(r_TUR_HS_80m_ffn)
+
+# crop and mask
+
+r_ffn = r_TUR_HS_80m_ffn
+v_ffn = POLY_ffn
+id_tag = "id"
+
+fname_list = clip_r2v(r_ffn, v_ffn, id_tag)
+
+#grab the id
+r_num = as.numeric(str_extract(fname_list, pattern = "(?<=EXTR\\_)\\d{5}"))
+r_clip_id = as.numeric(str_extract(fname_list, pattern = "(?<=id\\_tag\\_)\\d{5}"))
+
+
+```
+
+# CHNK 6003. Start plotting data from extracts
+
+```{r}
+
+# r_clip_ffn = ("F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE_EXTR/multi_or_TUR_20230811_2BYTE_EXTR_00019_id_tag_00012.tif")
+# 
+# 
+# 
+# r_clip_ffn = ("F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE_EXTR/multi_or_TUR_20230811_2BYTE_EXTR_00019_id_tag_00012.tif")
+
+
+
+clip_dn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE_EXTR"
+clip_fls = list.files(clip_dn, pattern = "tif$",full.names = T,include.dirs = F)
+
+#get the bandnumbers and the wavelengths
+bnwl = get_bnwl()
+bnames_lng = paste0("b", formatC(bnwl$bn, width = 5, flag = "0"), "-", formatC(bnwl$wl, digits = 5))
+bnames = paste0("b", formatC(bnwl$bn, width = 3, flag = "0"))
+
+#read the shape file again to get the metadata
+POLY_fn = "M600-NANO-TUR-230811-80M-POLYLBL-N00007-V01.shp"
+POLY_ffn = paste0(align_dn, POLY_fn)
+POLY = st_read(POLY_ffn)
+print(r_clip_id)
+ALL_POLY_ATTR = POLY %>% st_set_geometry(NULL) 
+
+for (ifile in 1:length(clip_fls)){
+  
+  # ifile = 1
+  
+  
+  
+  cclip_ffn = clip_fls[ifile]
+  
+  print(paste("Processing", cclip_ffn))
+  
+  #grab the id
+  r_clip_id = as.numeric(str_extract(cclip_ffn, pattern = "(?<=id\\_tag\\_)\\d{5}"))
+  
+  #grab the id
+  # r_clip_id = as.numeric(str_extract(cclip_ffn, pattern = "(?<=id\\_tag\\_)\\d{5}"))
+  
+  r_clip = rast(cclip_ffn)
+  # plot(r_clip)
+  
+  rval_DN = values(r_clip, dataframe=T, na.rm = T) %>% as_tibble()
+  rval = rval_DN/1e4
+  
+  
+  names(rval) <- bnames
+  
+  stat_list = list(
+    # npix = ~length(.x),
+    mean = ~mean(.x, na.rm = T),
+    sd = ~sd(.x, na.rm = T),
+    min = ~min(.x, na.rm = T),
+    max = ~max(.x, na.rm = T),
+    median = ~median(.x, na.rm = T)
+  )
+  
+  stat_chvec = c("mean", "sd", "min", "max", "median")
+  
+  
+  for (istat in 1:length(stat_list)){
+    # istat=1
+    cstat = stat_chvec[istat]
+    
+    rval_stats = rval %>% 
+      summarise(
+        across(everything(), stat_list[[cstat]])
+      ) 
+    rval_stats_tr = t(rval_stats) %>% as.data.frame() %>% as_tibble()
+    names(rval_stats_tr) = cstat
+    if (istat==1){
+      POLY_STATS = bind_cols(bnwl, rval_stats_tr)
+    }else{
+      
+      POLY_STATS = bind_cols(POLY_STATS, rval_stats_tr)
+    }
+    
+  }
+  
+  
+  #grab the meta data specific to this polygon
+  POLY_ATTR = ALL_POLY_ATTR %>% filter(id == r_clip_id) %>% slice(1)
+  
+  TXTLINE_1 = paste0("id         = ", POLY_ATTR$id)
+  TXTLINE_2 = paste0("species    = ", POLY_ATTR$SPS)
+  TXTLINE_3 = paste0("Confidence = ", POLY_ATTR$CONFIDENCE)
+  
+  #collate the data
+  POLY_STATS_WLBL = POLY_STATS %>% mutate(id = POLY_ATTR$id)
+  
+  if (ifile == 1){
+    POLY_STATS_COLL = POLY_STATS_WLBL
+  }else{
+    POLY_STATS_COLL = bind_rows(POLY_STATS_COLL, POLY_STATS_WLBL)
+  }
+  
+  #plot the spectra from a single polygon
+  
+  g = ggplot(POLY_STATS) + geom_ribbon(aes(x = wl, ymin = mean-sd, ymax = mean+sd), fill = "pink")
+  g = g + geom_line(aes(x = wl, y = mean), color = "dark blue")
+  g = g + labs(x = "Wavelength (nm)", y = "reflectance")
+  g = g + lims(x = c(380,1000), y = c(-.05,.8))
+  g = g + annotate("text", x = 450, y = .6, label = TXTLINE_1,)
+  g = g + annotate("text", x = 450, y = .55, label = TXTLINE_2)
+  g = g + annotate("text", x = 450, y = .5, label = TXTLINE_3)
+  
+  fig_fn = paste0(strip_fn(cclip_ffn),".png")
+  fig_dn = paste0(clip_dn, "/", "cclip_spectra/" )
+  if (!dir.exists(fig_dn)){dir.create(fig_dn, recursive = T, showWarnings = F)}
+  fig_ffn=paste0(fig_dn, fig_fn)
+  
+  ggsave(fig_ffn, g)
+  
+  
+  #save the collated data
+  POLY_STATS_COLL_dn = paste0(clip_dn, "/", "cclip_data/" )
+  if (!dir.exists(POLY_STATS_COLL_dn)){dir.create(POLY_STATS_COLL_dn, recursive = T, showWarnings = F)}
+  POLY_STATS_COLL_fn = "POLY_STATS_COLL.RDS"
+  POLY_STATS_COLL_ffn = paste0(POLY_STATS_COLL_dn, POLY_STATS_COLL_fn)
+  saveRDS(POLY_STATS_COLL, POLY_STATS_COLL_ffn)
+  
+}
+
+
+
+
+```
+
+# CHNK 6004. Analyse the collated HS data
+
+```{r}
+
+
+clip_dn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE_EXTR"
+
+POLY_STATS_COLL_dn = paste0(clip_dn, "/", "cclip_data/" )
+POLY_STATS_COLL_fn = "POLY_STATS_COLL.RDS"
+POLY_STATS_COLL_ffn = paste0(POLY_STATS_COLL_dn, POLY_STATS_COLL_fn)
+
+POLY_STATS_COLL = readRDS(POLY_STATS_COLL_ffn)
+
+#read the shape file again to get the metadata
+POLY_fn = "M600-NANO-TUR-230811-80M-POLYLBL-N00007-V01.shp"
+POLY_ffn = paste0(align_dn, POLY_fn)
+POLY = st_read(POLY_ffn)
+print(r_clip_id)
+ALL_POLY_ATTR = POLY %>% st_set_geometry(NULL) 
+
+#add the metadata to the collated data set
+POLY_STATS_COLL_WMETA = POLY_STATS_COLL %>% 
+  left_join(ALL_POLY_ATTR, by = "id") %>% 
+  mutate(SPS2 = case_when(
+    SPS == "ATT" ~ "ATT", 
+    SPS == "FALC" ~ "FALC",
+    SPS != "ATT" & SPS != "FALC" ~"OTHER"
+  ))
+
+
+
+
+```
+
+
+# ~~~~~~~~~~~~~~~~ #
+# Figure 6001 - Plot all mean spectra coloring by species
+# ~~~~~~~~~~~~~~~~ #
+
+
+```{r}
+
+fignum = 6001
+figdesc = "mean-spectra-colored-by-species"
+figfmt = "png"
+fig_ffn = paste0(plotdir, fignum,"-", figdesc, ".", figfmt)
+
+
+POLY_STATS_COLL_WMETA_grp = POLY_STATS_COLL_WMETA %>% filter(SPS2 != "OTHER")
+
+g = ggplot(POLY_STATS_COLL_WMETA_grp) 
+# g = g + geom_ribbon(aes(x = wl, ymin = mean-sd, ymax = mean+sd, fill = SPS2, alpha = 0.5))
+g = g + geom_line(aes(wl, mean, group = id,color = SPS2))
+g
+
+# g=g + scale_color_manual(name = "Land Cover")
+g = g + labs(x = "wavelength (nm)" , y = "Reflectance")
+g = gab_style(g,1)
+
+g = g +guides(color=guide_legend(nrow=2,byrow=TRUE))
+# g = g + theme
+g
+
+
+WD = 28
+HT = 8/18*28
+
+specdim = F
+
+
+ggsave(filename = fig_ffn, plot = g, width = WD, height = HT, units = "cm", bg = "white")
+
+if (specdim){
+  ggsave(filename = fig_ffn, plot = g, width = WD, height = HT, units = "cm", bg = "white")
+} else {
+  ggsave(filename = fig_ffn, plot = g,  units = "cm", bg = "white")
+}
+
+
+```
+
+
+# ~~~~~~~~~~~~~~~~ #
+# Figure 6002 - Plot mean of mean spectra coloring by species
+# ~~~~~~~~~~~~~~~~ #
+
+
+```{r}
+
+fignum = 6002
+figdesc = "mean-of-mean-spectra-colored-by-species"
+figfmt = "png"
+fig_ffn = paste0(plotdir, fignum,"-", figdesc, ".", figfmt)
+
+
+POLY_STATS_COLL_WMETA_sts = POLY_STATS_COLL_WMETA %>% 
+  group_by(SPS2, bn) %>% 
+  summarise(wl = first(wl),
+            refl_mean = median(median),
+            refl_sd = sqrt(mean(sd^2))) %>% 
+  filter(SPS2 != "OTHER")
+
+g = ggplot(POLY_STATS_COLL_WMETA_sts) 
+g = g + geom_ribbon(aes(x = wl, ymin = refl_mean-refl_sd, ymax = refl_mean+refl_sd, fill = SPS2), alpha = .25)
+g = g + geom_line(aes(wl, refl_mean, color = SPS2), size = 1)
+g
+
+# g=g + scale_color_manual(name = "Land Cover")
+g = g + labs(x = "wavelength (nm)" , y = "Reflectance")
+g = gab_style(g,1)
+
+g = g +guides(color=guide_legend(nrow=2,byrow=TRUE))
+# g = g + theme
+g
+
+
+WD = 28
+HT = .75*WD
+
+specdim = F
+
+
+
+if (specdim){
+  ggsave(filename = fig_ffn, plot = g, width = WD, height = HT, units = "cm", bg = "white")
+} else {
+  ggsave(filename = fig_ffn, plot = g,  units = "cm", bg = "white")
+}
+
+
+```
+
+# CHNK 6005. Hyperspectral End members
+
+```{r}
+
+r_TUR_HS_80m_ffn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE.kea"
+r_TUR_HS_80m = rast(r_TUR_HS_80m_ffn)
+
+POLYLBLHSEM_ffn = paste0(align_dn, "M600-NANO-TUR-230811-80M-POLYLBLHSEM-N00008-V01.shp")
+# crop and mask
+
+r_ffn = r_TUR_HS_80m_ffn
+v_ffn = POLYLBLHSEM_ffn
+id_tag = "id"
+extract_tag = "POLYLBLHSEM-N00008"
+
+fname_list = clip_r2v(r_ffn, v_ffn, id_tag, extract_tag = extract_tag,makeplots = T, collatedata = T)
+
+#now grab the collated data
+
+extract_dn = paste0(dirname(r_TUR_HS_80m_ffn), "/", strip_fn(r_TUR_HS_80m_ffn), "_EXTR_" , extract_tag, "/")
+colldata_dn = paste0(extract_dn, "cclip_data/")
+colldata_ffn = paste0(colldata_dn, "POLY_STATS_COLL.RDS")
+
+colldata = readRDS(colldata_ffn)
+colldata_FL = colldata %>% filter(class=="ATT-FL")
+
+```
+
+
+# ~~~~~~~~~~~~~~~~ #
+# Figure 6003 - Plot mean of end members
+# ~~~~~~~~~~~~~~~~ #
+
+
+```{r}
+
+fignum = 6003
+figdesc = "mean-of-mean-spectra-end-members"
+figfmt = "png"
+fig_ffn = paste0(plotdir, fignum,"-", figdesc, ".", figfmt)
+
+facet_or_single = "single"
+
+colldata_sts = colldata %>% 
+  group_by(class, bn) %>% 
+  summarise(wl = first(wl),
+            refl_mean = median(median, na.rm = T),
+            refl_sd = sqrt(mean(sd^2))) %>% 
+  mutate(
+    target = case_when(
+      class == "ATT-BF" ~ "ATT - well-lit leaves",
+      class == "ATT-FL" ~ "ATT - flowers",
+      class == "FALC-BF" ~ "Falcateria - well-lit leaves",
+      class == "SPS12-BF" ~ "Species#12 - well-lit leaves",
+    )
+  )
+
+g = ggplot(colldata_sts) 
+
+if (facet_or_single=="facet"){
+  g = g + geom_ribbon(aes(x = wl, ymin = refl_mean-refl_sd, ymax = refl_mean+refl_sd), alpha = .25)
+  g = g + facet_wrap(~target)
+  g = g + geom_line(aes(wl, refl_mean), size = 1)
+} else {
+  
+  # g = g + geom_ribbon(aes(x = wl, ymin = refl_mean-refl_sd, ymax = refl_mean+refl_sd, fill = target), alpha = .25)
+  
+  g = g + geom_line(aes(wl, refl_mean, color= target), size = 1)
+  
+}
+g
+
+# g=g + scale_color_manual(name = "Land Cover")
+g = g + labs(x = "wavelength (nm)" , y = "Reflectance")
+g = gab_style(g,1)
+
+g = g +guides(color=guide_legend(nrow=2,byrow=TRUE))
+
+g = g + theme(
+  legend.text = element_text(size = 10),
+  legend.title =  element_blank())
+g
+
+
+WD = 28
+HT = .75*WD
+
+specdim = F
+
+
+
+if (specdim){
+  ggsave(filename = fig_ffn, plot = g, width = WD, height = HT, units = "cm", bg = "white")
+} else {
+  ggsave(filename = fig_ffn, plot = g,  units = "cm", bg = "white")
+}
+
+
+```
+
+
+
+# CHNK 6006. Specify Planet Data and MAVIC bands
+
+
+```{r}
+
+# https://ag.dji.com/mavic-3-m/specs
+MAVIC_MS_B1_G_spec_centre = 560
+MAVIC_MS_B2_R_spec_centre = 650
+MAVIC_MS_B3_RE_spec_centre = 730
+MAVIC_MS_B4_NIR_spec_centre = 860
+
+MAVIC_MS_B1_G_spec_width = 16
+MAVIC_MS_B2_R_spec_width = 16
+MAVIC_MS_B3_RE_spec_width = 16
+MAVIC_MS_B4_NIR_spec_width = 26
+
+MAVIC_MS_spec_centres = c(MAVIC_MS_B1_G_spec_centre, MAVIC_MS_B2_R_spec_centre, MAVIC_MS_B3_RE_spec_centre, MAVIC_MS_B4_NIR_spec_centre) 
+
+MAVIC_MS_spec_widths = c(MAVIC_MS_B1_G_spec_width, MAVIC_MS_B2_R_spec_width, MAVIC_MS_B3_RE_spec_width, MAVIC_MS_B4_NIR_spec_width) 
+
+MAVIC_MS_spec = data.frame(centre = MAVIC_MS_spec_centres, width = MAVIC_MS_spec_widths)
+
+
+
+SKYSAT_MS_B1_B_spec_centre = 483
+SKYSAT_MS_B2_R_spec_centre = 555
+SKYSAT_MS_B3_RE_spec_centre = 650
+SKYSAT_MS_B4_NIR_spec_centre = 820
+
+SKYSAT_MS_B1_G_spec_width = 65
+SKYSAT_MS_B2_R_spec_width = 80
+SKYSAT_MS_B3_RE_spec_width = 90
+SKYSAT_MS_B4_NIR_spec_width = 160
+
+SKYSAT_MS_spec_centres = c(SKYSAT_MS_B1_B_spec_centre, SKYSAT_MS_B2_R_spec_centre, SKYSAT_MS_B3_RE_spec_centre, SKYSAT_MS_B4_NIR_spec_centre) 
+
+SKYSAT_MS_spec_widths = c(SKYSAT_MS_B1_G_spec_width, SKYSAT_MS_B2_R_spec_width, SKYSAT_MS_B3_RE_spec_width, SKYSAT_MS_B4_NIR_spec_width) 
+
+SKYSAT_MS_spec = data.frame(centre = SKYSAT_MS_spec_centres, width = SKYSAT_MS_spec_widths)
+
+SKYSAT_spec_resp_ffn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Planet/spectral-response.csv"
+
+SKYSAT_spec_resp = read_csv(SKYSAT_spec_resp_ffn)
+
+SKYSAT_spec_resp$band = factor(SKYSAT_spec_resp$band, levels = c("Blue","Green", "Red", "NIR"))
+
+g = ggplot(SKYSAT_spec_resp) + geom_line(aes(wl*1000, spec_resp, color = band))
+g = g + scale_color_manual(values = c("blue","green","red","purple"))
+g = g + labs(x = "Wavelength (nm)", y = "Relative spectral response (unitless)", color = "Band")
+
+g
+
+ggsave("T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Planet/spectral-response.png", g)
+
+
+```
+
+
+# CHNK 6007. Develop algorithm to extract these from the HS data
+
+```{r}
+
+
+#get the bandnumbers and the wavelengths
+bnwl = get_bnwl()
+bnames_lng = paste0("b", formatC(bnwl$bn, width = 5, flag = "0"), "-", formatC(bnwl$wl, digits = 5))
+bnames = paste0("b", formatC(bnwl$bn, width = 3, flag = "0"))
+
+
+#load an example data set
+example_tif_dn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE_EXTR/"
+example_tif_fn = "multi_or_TUR_20230811_2BYTE_EXTR_00013_id_tag_00077.tif"
+example_tif_ffn = paste0(example_tif_dn, example_tif_fn)
+
+example_img = rast(example_tif_ffn)
+example_data = nano_vals(example_img)
+example_data_extr = terra::extract(example_img)
+example_xy = terra::xyFromCell(example_img,1)
+
+class(example_data)
+
+# the above is difficult try using terraextract(
+
+
+POLY_fn = "M600-NANO-TUR-230811-80M-POLYLBL-N00007-V01.shp"
+POLY_ffn = paste0(align_dn, POLY_fn)
+POLY = st_read(POLY_ffn)
+
+
+r_TUR_HS_80m_ffn = "F:/HAHS_DATA/RARO/FLIGHT_100097_TUR_80m_E_20230811_230225/multi_or/tiles_2BYTE/multi_or_TUR_20230811_2BYTE.kea"
+r_TUR_HS_80m = rast(r_TUR_HS_80m_ffn)
+
+# crop and mask
+
+r_ffn = r_TUR_HS_80m_ffn
+v_ffn = POLY_ffn
+id_tag = "id"
+r <- rast(r_ffn)
+r_crs = crs(r)
+v_unprj <- vect(v_ffn)
+v = project(v_unprj,r_crs)
+vsel = v[7,] 
+
+r_extr = terra::extract(r, vsel, ID=T, xy=T, cells=T) %>% as_tibble()
+
+r_extr %>% pull(cell) %>% min()
+r_extr %>% pull(cell) %>% max()
+
+
+names(r_extr)
+names(r_extr)[2:270] = bnames
+
+r_extr_tr = r_extr %>% select(contains("b")) %>% 
+  as.matrix() %>% 
+  t %>% 
+  as.data.frame %>% 
+  as_tibble() %>% 
+  bind_cols(bnwl) %>% 
+  select(bn, wl, everything())
+
+#grab the MAVIC BBands
+
+band_spec = MAVIC_MS_spec
+band_spec = SKYSAT_MS_spec
+
+
+for (iband in 1:nrow(band_spec)){
+  
+  cband = band_spec[iband,]
+  cband_min = cband$centre - 0.5 * cband$width
+  cband_max = cband$centre + 0.5 * cband$width
+  
+  band_extr = r_extr_tr[r_extr_tr$wl >= cband_min & r_extr_tr$wl <= cband_max,]
+  
+  band_extr = r_extr_tr %>% filter(wl >= cband_min & wl <= cband_max) %>% 
+    summarise(across(everything(), mean)) %>% 
+    mutate(
+      BandNum = iband,
+      BandCentre = cband$centre,
+      BandWidth = cband$width
+    ) %>% 
+    select(BandNum, BandCentre, BandWidth, everything())
+  
+  if (iband==1){
+    
+    SIMUL_BANDS = band_extr
+    
+  }else{
+    
+    SIMUL_BANDS = bind_rows(SIMUL_BANDS, band_extr)
+    
+    
+  }
+  
+  
+}
+
+SIMUL_BANDS
+
+
+
+
+
+# EASIER STILL
+
+# lookup bands wl and find which band numbers
+
+# band_spec = SKYSAT_MS_spec
+band_spec = MAVIC_MS_spec
+band_spec_w_bn = band_spec %>% 
+  mutate(bn_min = NA, bn_max = NA)
+
+bnwl = get_bnwl()
+
+for (iband in 1:nrow(band_spec)){
+  
+  # iband = 4
+  print(iband)
+  c_cent = band_spec$centre[iband]
+  c_wid = band_spec$width[iband]
+  wl_min =c_cent- c_wid
+  wl_max =c_cent+ c_wid
+  bands2include = bnwl %>% filter(wl >= wl_min & wl <= wl_max) %>% pull(bn)
+  bn_min = min(bands2include)
+  bn_max = max(bands2include)
+  band_spec_w_bn$bn_min[iband] = bn_min
+  band_spec_w_bn$bn_max[iband] = bn_max
+  
+  r_sel = mean(r[[bn_min:bn_max]], na.rm=T)
+  
+  if (iband==1){
+    
+    r_sim = r_sel
+    bnames = "B1"
+  }else{
+    
+    r_sim = c(r_sim, r_sel)
+    bnames = c(bnames, paste0("B", iband))
+  }
+    
+  
+    
+}
+
+names(r_sim) <- bnames
+
+
+# writeRaster(r_sim, paste0(align_dn, "M600-NANO-TUR-230720-80-SKYSAT_SIM-N00010-V01.tif"), overwrite=T)
+writeRaster(r_sim, paste0(align_dn, "M600-NANO-TUR-230720-80-MAVICMS_SIM-N00011-V01.tif"), overwrite=T)
+
+
+plot(r_sim)
+
+r_sel = r[[5:11]]
+r_sel_avg = mean(r_sel)
+
+```
+
+
+
+
+
+
+# ===================================
+# SECTION 7000 - AERIAL - TRAINING POLYGONS 
+# ===================================
+
+Have created a layer called: AERIAL-RGB-TUR-230720-1200m-N00009-V01.shp
+This contains 247 Polygons, 151 of which are ATT
+
+# CHNK 7001. Create an ATT Only Polygon layer for training on DeepSeg
+
+```{r}
+
+
+Aerial_POLYLBL_ffn = paste0(align_dn, "AERIAL-RGB-TUR-230720-1200m-N00009-V01.shp")
+Aerial_POLYLBL = st_read(Aerial_POLYLBL_ffn)
+
+# filter these for ATT
+Aerial_POLYLBL_ATT_only = Aerial_POLYLBL %>% 
+  filter(SPS == "ATT")
+
+Aerial_POLYLBL_ATT_only_ffn = paste0(align_dn, "AERIAL-RGB-TUR-230720-1200m-N00009-V01-ATT-ONLY.shp")
+
+st_write(Aerial_POLYLBL_ATT_only, Aerial_POLYLBL_ATT_only_ffn, append=F)
+
+
+
+
+
+
+```
+
+
+
+
+# ===================================
+# SECTION 8000 - MS ANALYSIS
+# ===================================
+
+
+```{r}
+
+
+
+
+
+
+
+
+
+```
+

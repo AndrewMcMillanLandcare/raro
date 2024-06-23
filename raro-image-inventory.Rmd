@@ -1,0 +1,414 @@
+---
+title: "Raro Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+
+
+
+util_script = paste0("C:/Users/McMillanAn/OneDrive - MWLR/Code/R/utils/", "mcm_sp_utils.R")
+source(util_script)
+
+align_dn ="T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Aligned-Data/"
+
+
+
+```
+
+
+```{r}
+
+fn = "M600-NANO-TUR-230811-80M-RASTOL-N00006-V01.shp"
+ffn = paste0(align_dn, fn)
+
+sp = st_read(ffn)
+
+AREA = get_area(sp)
+
+
+```
+
+
+# Mavic Orthos
+
+```{r}
+
+mavic_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Mavic3 Flights - Processed/"
+mavic_orthos_dn = paste0(mavic_dn, "orthos/")
+
+fls = list.files(mavic_orthos_dn, pattern="*.kea$|*.tif$")
+fls_df = data.frame(filenames = fls)
+filelist_csv_ffn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Mavic3 Flights - Processed/mavic-files.csv"
+
+write_csv(fls_df, filelist_csv_ffn)
+
+
+
+
+
+```
+
+# Mavic DSMS
+
+```{r}
+
+mavic_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Mavic3 Flights - Processed/"
+mavic_orthos_dn = paste0(mavic_dn, "DEMs/")
+
+fls = list.files(mavic_orthos_dn, pattern="*.kea$|*.tif$")
+fls_df = data.frame(filenames = fls)
+filelist_csv_ffn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Mavic3 Flights - Processed/mavic-DEM-files.csv"
+
+write_csv(fls_df, filelist_csv_ffn)
+
+
+
+
+
+```
+
+
+```{r}
+
+# Load necessary library
+library(terra)
+
+# Load the raster image
+raster_image <- rast("path_to_your_raster_file.tif")  # Adjust path as necessary
+
+# Create a mask where non-zero cells are marked and zero cells are set to NA
+mask <- ifel(raster_image != 0, 1, NA)
+
+# Convert masked raster to vector (polygons)
+polygons <- as.polygons(mask, values=TRUE, dissolve=TRUE)
+
+# Save the polygons to a shapefile
+shapefile_name <- "output_polygon.shp"  # Specify your desired output file name
+writeVector(polygons, shapefile_name, "ESRI Shapefile")
+
+
+
+
+```
+
+# get raster oultines for the following images
+
+```{r}
+
+
+
+skysat_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/PlanetData/original_delivery/Rarotonga_July_Aug_2023_skysatcollect_analytic_sr_udm2 (1)/SkySatCollect/"
+
+skysat_ptrn = "^//d{8}//_//d{6}//_ssc//d{1,3}//_u//d{4}//_analytic//_SR//.tif$"
+
+fls = list.files(skysat_dn, skysat_ptrn, full.names = T)
+fls[1]
+
+OL1 = rast_outline(fls[1])
+OL2 = rast_outline(fls[2])
+OL3 = rast_outline(fls[3])
+OL4 = rast_outline(fls[4])
+OL5 = rast_outline(fls[5])
+OL6 = rast_outline(fls[6])
+OL7 = rast_outline(fls[7])
+
+
+for (i in 5:7){rast_outline(fls[i])}
+
+rast_outline(fls[6])
+
+
+```
+
+#sampling grid for paul
+
+```{r}
+
+grid_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/HarleyB/RARO_SEGMENTATION/Shapefiles/"
+
+grid_200_poly_ffn = paste0(grid_dn, "Raro_sampling_grid.shp" )
+grid_200_poly = st_read(grid_200_poly_ffn) %>% st_set_crs(32704)
+
+grid_200_poly_mdf = grid_200_poly %>% 
+  mutate(
+    mapped = "ABSENT",
+    truth = "ABSENT",
+    checked = "-1",
+    comment = "",
+    Id = Grid_ID
+    
+    
+  ) 
+  
+  
+grid_200_poly_mdf_ffn = paste0(grid_dn, "Raro_sampling_grid_200m.shp" )
+
+st_write(grid_200_poly_mdf, grid_200_poly_mdf_ffn, append = F)
+
+
+```
+
+#Same again but for 100 m sampling grid
+```{r}
+
+grid_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/HarleyB/RARO_SEGMENTATION/Shapefiles/"
+
+grid_100_poly_ffn = paste0(grid_dn, "Raro_sampling_grid_100m.shp" )
+grid_100_poly = st_read(grid_100_poly_ffn) %>% st_set_crs(32704)
+
+grid_100_poly_mdf = grid_100_poly %>% 
+  mutate(
+    mapped = "ABSENT",
+    truth = "ABSENT",
+    checked = "-1",
+    comment = "",
+    Id = Grid_ID
+    
+    
+  ) 
+  
+  
+grid_100_poly_mdf_ffn = paste0(grid_dn, "Raro_sampling_grid_100m.shp" )
+
+st_write(grid_100_poly_mdf, grid_100_poly_mdf_ffn, append = F)
+
+
+```
+
+raster outlines for 
+mavic 30 m data
+
+```{r}
+
+
+mavic_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Mavic3 Flights - Processed/orthos/"
+
+fls = list.files(mavic_dn, pattern = "^/\d{6}\\-\\w{3}\\-\\w{5,10}\\-30m.{1,12}\\.tif$", full.names = T)
+for (i in 2:length(fls)){rast_outline(fls[i])}
+
+
+fls = list.files(mavic_dn, pattern = "^\\d{6}\\-\\w{3}\\-\\w{5,10}\\-100m.{1,12}\\.tif$", full.names = T)
+for (i in 1:length(fls)){rast_outline(fls[i])}
+
+
+```
+
+#filter Jans prediction files
+
+```{r}
+
+
+pred_dn = "T:/Palmerston North/Projects P-T/Remote Sensing of Weeds - Pacific Islands/Data/Rarotonga/Deep-Learning-Progress/JansLayers/"
+
+
+fls = list.files(pred_dn, pattern = "baseline_epoch_81_step_574_valacc-0.gpkg$", full.names =  T )
+
+for (ifile in 1:length(fls)){
+  # ifile=1
+  
+  cfile = fls[ifile]
+  polys = st_read(cfile) %>% 
+    mutate(AREA_SQM = as.numeric(st_area(.))) %>% 
+    filter(AREA_SQM >= 1)
+  
+  file_out = paste0(tools::file_path_sans_ext(cfile),"_filt.gpkg")
+  st_write(polys, file_out, append = F)
+}
+
+  
+  
+  
+  
+  
+  }
+
+
+```
+
+
+#next steps - ok we have found that (R-G)/(R+G) on aerial imagery will detect the flowering trees but it confuses the road. We need to take zonal statistics of the layer raro-ortho-v3.kea through the polygons 'Indices-Shape.shp' and work out some additional condition to remove the road
+
+
+
+```{r}
+
+library(terra)
+
+proj_folder_ssd_dn = "F:/Rarotonga/"
+img_dn = paste0(proj_folder_ssd_dn, "IMAGERY/")
+
+Aerial_img_ffn = paste0(img_dn, "AERIAL/raro-ortho-v3.kea")
+Aerial_img = rast(Aerial_img_ffn)
+
+Aerial_RGBVI= ( Aerial_img[[2]] - Aerial_img[[1]]*Aerial_img[[3]])/( Aerial_img[[2]] + Aerial_img[[1]]*Aerial_img[[3]])
+Aerial_RGBVI_ffn = paste0(proj_folder_ssd_dn, "INDICES/Aerial_RGBVI.tif")
+writeRaster(Aerial_RGBVI, Aerial_RGBVI_ffn, overwrite=T)
+
+Indices_shp_ffn = paste0(proj_folder_ssd_dn, "INDICES/Indices-shape.gpkg")
+Indices_shp = vect(Indices_shp_ffn)
+
+
+
+zstats = terra::zonal(Aerial_img, Indices_shp, fun="mean", na.rm=T, as.polygons=T)
+
+zstats_anl = zstats %>% 
+  st_as_sf() %>% 
+  st_set_geometry(NULL)
+
+names(zstats_anl)[3:5] <- c("B1", "B2", "B3")
+
+zstats_anl_smy = zstats_anl %>% 
+  group_by(ObjectType) %>% 
+  summarise(
+    B1_av = mean(B1),
+    B2_av = mean(B2),
+    B3_av = mean(B3),
+    B1_sd = sd(B1),
+    B2_sd = sd(B2),
+    B3_sd = sd(B3)
+    
+    )
+
+indices = zstats_anl_smy %>% 
+  select(ObjectType:B3_av) %>% 
+  mutate(
+    RGdiff = (B3_av - B2_av)/(B3_av + B2_av),
+    EVI_VIS = (B3_av - B2_av)/(B3_av + B2_av - 2*B1_av))
+
+indices
+indices %>% filter(ObjectType == "ATT-F" | ObjectType == "Road")
+
+zstats_anl_smy_av = zstats_anl_smy %>% 
+  gather(Band, Refl, 2:4, ) %>% 
+  select(ObjectType,Band, Refl)
+
+
+zstats_anl_smy_sd = zstats_anl_smy %>% 
+  gather(Band, Refl, 5:7, ) %>% 
+  select(ObjectType,Band, Refl)
+
+zstats_anl_smy_av$Refl_SD = zstats_anl_smy_sd$Refl
+
+# zstats_anl_smy_lng = zstats_anl_smy_av %>% bind_cols(zstats_anl_smy_sd[,2:3])
+
+g=ggplot(zstats_anl_smy_av) + geom_point(aes(ObjectType , Refl)) + facet_wrap(~Band)
+g = g + geom_errorbar(aes(x = ObjectType, ymin = Refl-Refl_SD, ymax = Refl+Refl_SD ), width = .2)
+g = g + theme(axis.text.x = element_text(angle=90))
+g
+
+
+# Try cropping instead and using pixel by pixel maths for indices
+# see https://plantmethods.biomedcentral.com/articles/10.1186/s13007-019-0402-3/tables/6
+
+
+
+Indices_sf = Indices_shp %>% st_as_sf()
+
+for (i in 1:nrow(Indices_sf)){
+  # i=1
+  shp_sel=slice(Indices_sf,i)
+  curr_id = shp_sel$id
+  curr_obj = shp_sel$ObjectType
+  CRP_sel = crop(Aerial_img, shp_sel, mask=T)
+  CRP_sel_data = values(CRP_sel) %>% 
+    as_tibble() %>% 
+    `colnames<-`(c("B1", "B2", "B3")) %>% 
+    filter(!is.na(B1)) %>% 
+    mutate(
+      b = B1/(B1 + B2 + B3),
+      g = B2/(B1 + B2 + B3),
+      r = B3/(B1 + B2 + B3),
+      VARI = (g - r) / ( g + r - b),
+      ExG = 2*g - r - b,
+      ExB = (1.4*B1 - B2)/(B1 + B2 + B3),
+      ExR = (1.4 * B3 - B2)/(B2 + B3 + B1),
+      ExGR = ExG - ExR,
+      GRVI = (B2 - B3) / (B2 + B3),
+      MGRVI = (B2*2 - B3*2) / (B2*2 + B3*2),
+      GLI = (2*g - r - b)/(- r - b),
+      RGBVI = (B2^2 - B1*B2) / (B2^2 + B1*B2),
+      IKAW = (B3 - B1)/(B3 + B1)
+    ) %>% 
+    
+    summarise(
+      across(everything(), list(mean=mean, sd=sd))
+    ) %>% 
+    mutate(
+      id = curr_id,
+      object= curr_obj
+      
+    ) %>% 
+    dplyr::select(id, object,everything())
+  
+  if (i ==1){
+    
+    OBJ_SMY_STATS = CRP_sel_data
+    
+    
+  }else{
+    
+    OBJ_SMY_STATS =OBJ_SMY_STATS %>% bind_rows(CRP_sel_data)
+    
+  }
+}
+
+
+OBJ_SMY_STATS_av_smy = OBJ_SMY_STATS %>% 
+  group_by(object) %>% 
+  summarise(
+    across(contains("mean"), mean)
+  ) %>% 
+  gather(SVI, mean, -object) %>% 
+  mutate(SVI = str_extract(SVI, "[^_]+"))
+
+OBJ_SMY_STATS_sd_smy = OBJ_SMY_STATS %>% 
+  group_by(object) %>% 
+  mutate(
+    across(contains("sd"), ~ .x * .x)
+  ) %>% 
+  summarise(
+    across(contains("sd"), sum)
+  ) %>% 
+  mutate(
+    across(contains("sd"), ~ sqrt(.x))
+  )%>% 
+  gather(SVI, sd, -object)%>% 
+  mutate(SVI = str_extract(SVI, "[^_]+"))
+
+
+
+OBJ_SMY_STATS_sts_smy = OBJ_SMY_STATS_av_smy %>% 
+  left_join(OBJ_SMY_STATS_sd_smy, by = c("object","SVI"))
+
+obj_sel = c("ATT-F","ATT-NF", "FALC", "Road")
+
+OBJ_SMY_STATS_sts_smy_filt = OBJ_SMY_STATS_sts_smy %>% 
+  filter(object %in% obj_sel ) 
+  
+
+svi_order = c("B1","B2","B3","b","r","g","VARI","ExG","ExR","ExGR","GRVI","MGRVI","GLI","RGBVI","IKAW")
+OBJ_SMY_STATS_sts_smy_filt$SVI = factor(OBJ_SMY_STATS_sts_smy_filt$SVI, levels = svi_order)
+
+g=ggplot(OBJ_SMY_STATS_sts_smy_filt) + geom_point(aes(object , mean)) + facet_wrap(~SVI  , scales = 'free_y'   )
+g = g + geom_errorbar(aes(x = object, ymin = mean-sd, ymax = mean+sd), width = .2)
+g = g + theme(axis.text.x = element_text(angle=90))
+g
+
+
+CRP=terra::crop(Aerial_img, Indices_shp, mask=T)
+
+plot(CRP)
+
+pd = .9
+
+g = ggplot(OBJ_SMY_STATS) + geom_point(aes(object, IKAW_mean),position = position_dodge(width = pd) )
+g = g + geom_errorbar(aes(object, ymin = IKAW_mean - IKAW_sd, ymax = IKAW_mean + IKAW_sd), width = .2, position = position_dodge(width = pd))
+g = g + theme(axis.text.x = element_text(angle=90))
+g
+
+
+```
+

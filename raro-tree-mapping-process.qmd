@@ -1,0 +1,99 @@
+---
+title: "Raro-tree-analysis"
+author: "Andrew McMillan"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This document shows the results of the ATT and Falcataria tree mapping
+
+## Steps in the process
+
+1.  Digitising ATT/Falc on aerial imagery using high resolution drone imagery as guidance. This was done at the five drone sites
+2.  Manually going through the imagery and classifying each tree as flowering or non-flowering using Map Accuracy
+3.  Passing the classified imagery to a deep learning model and making an initial prediction of ATT across the whole island.
+4.  Using the prediction in a 2nd round to create an augmented training set
+
+### Define the data sets
+
+```{r}
+library(tidyverse)
+library(sf)
+
+root_dn = "F:/"
+
+proj_dn = paste0(root_dn,"Rarotonga/")
+ATT_dig_dn = paste0(proj_dn,"DIGITISATION/")
+
+
+# Andrew's digitisation
+MAT_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/AERIAL-ATT-OUTLINES-MAT.shp")
+TUR_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/AERIAL-ATT-OUTLINES-TUR.shp")
+
+# Harleys's digitisation
+AVA_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/Harley/Avatiu_manual_mapping_30m_ATT_HB.shp")
+TAK_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/Harley/Takuvaine_manual_mapping_30m_ATT_HB.shp")
+TCA_ATT_dig_ffn = paste0(ATT_dig_dn, "AERIAL/Harley/Takitimu_manual_mapping_30m_ATT_HB.shp")
+
+SITES = c("MAT","TUR","AVA","TAK", "TCA")
+SITE_ffns = c(MAT_ATT_dig_ffn, TUR_ATT_dig_ffn, AVA_ATT_dig_ffn, TAK_ATT_dig_ffn, TCA_ATT_dig_ffn)
+
+```
+
+### Read the digised ATT data that Harley and I dd on week of 14 May 2024
+
+We digitised ATT in the aerial footage to extent of the Mavic 30m footage. We used Jans predictions on the Mavic Imagery to point us to where the ATT were. The 30 m imagery was resolved enough so that the deep learning could resolve the distinctive leaf pattern of ATT.
+
+Andrew did Matavera (MAT) and Turangi (TUR), Harley did Avatiu (AVA), Takitimu (TCA) and Takuvaine (TAK).
+
+```{r}
+
+
+
+# i = 3
+
+
+for (i in 1:length(SITE_ffns)){
+  
+  ATT_dig_ffn_curr = SITE_ffns[i]
+  ATT_site_curr = SITES[i]
+  ATT_polys_curr = st_read(ATT_dig_ffn_curr)
+  
+  ATT_polys_curr_hmzd = ATT_polys_curr %>% 
+    mutate(
+      sub_id = 1:nrow(ATT_polys_curr),
+      site = ATT_site_curr,
+      mapped = "NF",
+      truth = "NF",
+      checked = -1,
+      comment = ""
+    ) %>% 
+    dplyr::select(
+      sub_id,      site,      mapped,      truth,      checked,      comment
+    )
+  
+  if (i == 1){
+    
+    ATT_polys_all_hmzd = ATT_polys_curr_hmzd
+    
+  } else {
+    
+    ATT_polys_all_hmzd = ATT_polys_all_hmzd %>% bind_rows(ATT_polys_curr_hmzd)
+    
+  }
+  
+}
+
+
+ATT_polys_all_hmzd =ATT_polys_all_hmzd %>% mutate(id = 1:nrow(.))
+
+ATT_polys_all_hmzd_fn = 'AERIAL/Combined-Harmonised-ATT-Shapes/raro-ATT-polys-aerial.shp'
+ATT_polys_all_hmzd_ffn = paste0(ATT_dig_dn, ATT_polys_all_hmzd_fn)
+
+st_write(ATT_polys_all_hmzd, ATT_polys_all_hmzd_ffn, append = T)
+
+```
+
+
